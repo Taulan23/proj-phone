@@ -1,0 +1,316 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  phone         String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  orders        Order[]
+  reviews       Review[]
+  cart          Cart?
+  favorites     Favorite[]
+  addresses     Address[]
+}
+
+model Category {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  description   String?
+  image         String?
+  parentId      String?
+  parent        Category? @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children      Category[] @relation("CategoryToCategory")
+  products      Product[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Brand {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  logo          String?
+  products      Product[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Product {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  description   String?
+  price         Float
+  oldPrice      Float?
+  sku           String    @unique
+  inStock       Boolean   @default(true)
+  stockQuantity Int       @default(0)
+  categoryId    String
+  category      Category  @relation(fields: [categoryId], references: [id])
+  brandId       String
+  brand         Brand     @relation(fields: [brandId], references: [id])
+  images        ProductImage[]
+  specifications ProductSpecification[]
+  reviews       Review[]
+  orderItems    OrderItem[]
+  cartItems     CartItem[]
+  favorites     Favorite[]
+  promotions    ProductPromotion[]
+  combos        ComboProduct[]
+  relatedCombos ComboProduct[] @relation("RelatedProduct")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Специфичные для смартфонов поля
+  screenSize    Float?
+  memory        Int?
+  storage       Int?
+  hasNFC        Boolean   @default(false)
+  has5G         Boolean   @default(false)
+  color         String?
+  batteryCapacity Int?
+}
+
+model ProductImage {
+  id            String    @id @default(cuid())
+  url           String
+  alt           String?
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order         Int       @default(0)
+  createdAt     DateTime  @default(now())
+}
+
+model ProductSpecification {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name          String
+  value         String
+  group         String?
+  order         Int       @default(0)
+}
+
+model Review {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  rating        Int
+  title         String?
+  content       String
+  pros          String?
+  cons          String?
+  isVerified    Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Cart {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id])
+  items         CartItem[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model CartItem {
+  id            String    @id @default(cuid())
+  cartId        String
+  cart          Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  quantity      Int       @default(1)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([cartId, productId])
+}
+
+model Favorite {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  createdAt     DateTime  @default(now())
+  
+  @@unique([userId, productId])
+}
+
+model Order {
+  id            String    @id @default(cuid())
+  orderNumber   String    @unique
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  status        OrderStatus @default(PENDING)
+  total         Float
+  subtotal      Float
+  discount      Float     @default(0)
+  deliveryFee   Float     @default(0)
+  items         OrderItem[]
+  deliveryType  DeliveryType
+  paymentMethod PaymentMethod
+  isPaid        Boolean   @default(false)
+  paidAt        DateTime?
+  addressId     String?
+  address       Address?  @relation(fields: [addressId], references: [id])
+  promocodeId   String?
+  promocode     Promocode? @relation(fields: [promocodeId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model OrderItem {
+  id            String    @id @default(cuid())
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  quantity      Int
+  price         Float
+  createdAt     DateTime  @default(now())
+}
+
+model Address {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  name          String
+  street        String
+  city          String
+  region        String?
+  postalCode    String?
+  country       String    @default("Россия")
+  phone         String
+  isDefault     Boolean   @default(false)
+  orders        Order[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Promocode {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  description   String?
+  discountType  DiscountType
+  discountValue Float
+  minOrderAmount Float?
+  maxDiscount   Float?
+  usageLimit    Int?
+  usageCount    Int       @default(0)
+  validFrom     DateTime
+  validTo       DateTime
+  isActive      Boolean   @default(true)
+  orders        Order[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Promotion {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  type          PromotionType
+  value         Float
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean   @default(true)
+  products      ProductPromotion[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model ProductPromotion {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  promotionId   String
+  promotion     Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  
+  @@unique([productId, promotionId])
+}
+
+model ComboOffer {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  discount      Float
+  discountType  DiscountType
+  isActive      Boolean   @default(true)
+  products      ComboProduct[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model ComboProduct {
+  id            String    @id @default(cuid())
+  comboId       String
+  combo         ComboOffer @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  mainProductId String
+  mainProduct   Product   @relation(fields: [mainProductId], references: [id])
+  relatedProductId String
+  relatedProduct Product  @relation("RelatedProduct", fields: [relatedProductId], references: [id])
+  
+  @@unique([comboId, mainProductId, relatedProductId])
+}
+
+enum Role {
+  USER
+  ADMIN
+  MANAGER
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum DeliveryType {
+  PICKUP
+  COURIER
+}
+
+enum PaymentMethod {
+  CARD
+  CASH
+  INSTALLMENT
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PromotionType {
+  SALE
+  SPECIAL_OFFER
+  CLEARANCE
+}
